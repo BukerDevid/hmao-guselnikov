@@ -1,0 +1,55 @@
+- name: Install Docker and Docker Compose on our FuKiNG SYSTEM!!!!
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Download the Docker installer
+      get_url:
+        url: https://get.docker.com/
+        dest: /root/install_docker.sh
+        mode: 0700
+      when: docker_check.stderr.find('service could not be found') != -1
+
+    - name: Install Docker
+      shell: /root/install_docker.sh
+      when: docker_check.stderr.find('service could not be found') != -1
+
+    - name: Remove the Docker installer file.
+      file:
+        state: absent
+        path: /root/install_docker.sh
+
+    - name: Download and install Docker Compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/1.21.2/docker-compose-Linux-x86_64
+        dest: /usr/bin/docker-compose
+        mode: 0755
+
+    - name: Copy Dockerfile
+      copy: 
+      # Prepare docker-compose
+      - src=docker-compose.yml dest=/docker-compose.yml
+      # Prepare skillcloud-nginx
+      - src=index.html dest=/skillcloud-nginx/site/index.html
+      - src=Dockerfile-site dest=/skillcloud-nginx/site/Dockerfile
+      # Prepare skillcloud-site
+      - src=nginx.conf dest=/skillcloud-nginx/balance/nginx.conf
+      - src=Dockerfile-balance dest=/skillcloud-nginx/balance/Dockerfile
+
+    - name: Build image EBALance
+      docker_image:
+        path: /skillcloud-nginx/balance
+        name: balance
+        tag: balance
+
+    - name: Build image SITE
+      docker_image:
+        path: /skillcloud-nginx/site
+        name: site
+        tag: site
+    
+    - name: Compose ready
+      become: True
+      shell:
+        cmd: "docker-compose up -d"
+        chdir: / 
